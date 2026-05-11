@@ -1,0 +1,28 @@
+{
+  "name": "track-remap",
+  "version": "1.0.0",
+  "description": "CDN-distributed JS library for remapping real tracks to virtual representations (bundles image-to-path and path-to-fit in a single build; currently outputs FIT)",
+  "type": "module",
+  "main": "dist/track-remap.js",
+  "scripts": {
+    "build": "sh -c \"test -d node_modules/esbuild || npm ci; node build.js\"",
+    "demo": "npx --yes serve . -l 5000"
+  },
+  "keywords": [
+    "fit",
+    "garmin",
+    "route",
+    "path",
+    "cdn",
+    "remap",
+    "track"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@markw65/fit-file-writer": "^0.1.8",
+    "fit-file-parser": "^2.3.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

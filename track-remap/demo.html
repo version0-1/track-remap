@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apply image route to FIT</title>
+  <style>
+    body { font-family: sans-serif; margin: 1rem; max-width: 900px; }
+    h1 { font-size: 1.2rem; }
+    h2 { font-size: 1rem; margin: 1rem 0 0.5rem; color: #333; }
+    .row { margin: 0.5rem 0; }
+    input[type="file"] { margin-right: 0.5rem; }
+    button { padding: 0.4rem 0.8rem; cursor: pointer; }
+    #log { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
+    .file-input-row { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+    .file-input-row input[type="file"] { display: none; }
+    .file-choose-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .file-name {
+      font-size: 0.9rem;
+      color: #555;
+      max-width: 520px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .section {
+      background: #f9f9f9;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    .section h2 { margin-top: 0; }
+    .section.done { border-color: #8c8; background: #f0fff0; }
+    .options { margin: 0.75rem 0; }
+    .option-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.6rem 0; flex-wrap: wrap; }
+    .option-row label { min-width: 140px; font-size: 0.9rem; }
+    .option-row input[type="range"] { flex: 1; min-width: 120px; max-width: 200px; }
+    .option-row .value { min-width: 2.5rem; font-size: 0.9rem; color: #555; }
+    #result { margin-top: 1rem; }
+    canvas { border: 1px solid #ccc; margin-top: 0.5rem; display: block; max-width: 100%; }
+    #mapContainer { height: 280px; margin-top: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+    .processing-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .processing-overlay .msg { font-size: 1rem; color: #333; }
+    .image-edit-panel {
+      margin: 0.75rem 0;
+      padding: 0.75rem 1rem;
+      background: #f5f8fc;
+      border: 1px solid #d0dbe8;
+      border-radius: 8px;
+    }
+    .image-edit-panel .cropper-wrap {
+      max-height: min(420px, 55vh);
+      margin: 0.5rem 0;
+      overflow: hidden;
+      border-radius: 4px;
+      background: #f0f0f0;
+    }
+    .image-edit-panel .cropper-wrap img#cropperTarget {
+      max-width: 100%;
+      max-height: min(420px, 55vh);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
+    }
+    .image-edit-panel .cropper-wrap .cropper-container {
+      max-height: min(420px, 55vh);
+    }
+    .image-edit-panel .edit-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .image-edit-panel .edit-panel-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem 1rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid #d0dbe8;
+    }
+    .image-edit-panel .edit-panel-header-left { display: flex; align-items: center; min-height: 2rem; }
+    .image-edit-panel .edit-panel-header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .image-edit-panel .edit-panel-header-actions button {
+      font-size: 0.85rem;
+      padding: 0.35rem 0.65rem;
+    }
+    .image-edit-panel .step-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #345;
+      background: #e8eef5;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+    }
+    .image-edit-panel .edit-step-title {
+      font-size: 0.95rem;
+      margin: 0 0 0.5rem 0;
+      color: #234;
+      font-weight: 600;
+    }
+    .image-edit-panel .edit-step1-foot {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      margin: 0.5rem 0;
+    }
+    .image-edit-panel .edit-toolbar--advance {
+      justify-content: flex-end;
+      margin-top: 0.15rem;
+    }
+    .image-edit-panel .edit-btn-primary {
+      font-weight: 600;
+      padding: 0.45rem 0.9rem;
+    }
+    .image-edit-panel .edit-hint {
+      font-size: 0.82rem;
+      color: #555;
+      line-height: 1.45;
+      margin: 0.35rem 0 0.65rem 0;
+      max-width: 42em;
+    }
+    .bg-preview-wrap {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      overflow: hidden;
+      background-color: #ffffff;
+    }
+    .bg-preview-wrap img { vertical-align: middle; }
+    .bg-mask-stage {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      line-height: 0;
+      vertical-align: top;
+    }
+    .bg-mask-stage canvas#bgMaskBase {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      cursor: none;
+      touch-action: none;
+      margin-top: 0;
+      border: none;
+    }
+    .bg-brush-cursor {
+      position: absolute;
+      left: 0;
+      top: 0;
+      pointer-events: none;
+      display: none;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+      box-sizing: border-box;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+    }
+    /* Keep the frame to canvas size so block layout does not stretch full width */
+    #bgMaskOuterWrap.bg-mask-stage {
+      display: block;
+      width: fit-content;
+      max-width: 100%;
+      margin: 0.5rem auto;
+    }
+    #bgMaskStage {
+      position: relative;
+      display: block;
+      width: fit-content;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      line-height: 0;
+    }
+    .flow-step {
+      margin: 1rem 0;
+      padding: 0.75rem 1rem;
+      border-left: 4px solid #c5d3e6;
+      background: #fafcfe;
+      border-radius: 0 8px 8px 0;
+    }
+    .flow-step-title {
+      font-size: 1rem;
+      margin: 0 0 0.5rem 0;
+      color: #223;
+      font-weight: 600;
+    }
+    .flow-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.65rem;
+      height: 1.65rem;
+      margin-right: 0.4rem;
+      padding: 0 0.25rem;
+      background: #345;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.85rem;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+    .quick-choice {
+      margin: 0.65rem 0 0.25rem 0;
+      padding: 0.75rem 1rem;
+      border: 1px solid #dbe6f2;
+      background: #f7faff;
+      border-radius: 8px;
+    }
+    .quick-choice .title {
+      margin: 0 0 0.5rem 0;
+      font-size: 0.9rem;
+      color: #234;
+      font-weight: 600;
+    }
+    .quick-choice .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      margin: 0 0 0.35rem 0;
+    }
+    .quick-choice .actions button {
+      padding: 0.45rem 0.8rem;
+    }
+    .route-preview-heading {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin: 0 0 0.35rem 0;
+    }
+    .route-spinner {
+      display: none;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid #d0d8e0;
+      border-top-color: #345;
+      border-radius: 50%;
+      animation: route-spin 0.65s linear infinite;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+    .route-spinner.is-active {
+      display: inline-block;
+    }
+    .route-loading-text {
+      display: none;
+      font-size: 0.85rem;
+      color: #456;
+      font-weight: 600;
+    }
+    .route-loading-text.is-active {
+      display: inline;
+    }
+    @keyframes route-spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/cropperjs@1.5.13/dist/cropper.min.js" crossorigin=""></script>
+</head>
+<body>
+  <h1>Apply image route to FIT</h1>
+
+  <div class="section" id="section1">
+    <h2>1. Build a point sequence for the route from the image</h2>
+
+    <div class="flow-step">
+      <h3 class="flow-step-title"><span class="flow-num">1</span>Select image</h3>
+      <div class="row file-input-row">
+        <button type="button" class="file-choose-btn" data-file-target="fileImage" aria-controls="fileImage">Choose file</button>
+        <span class="file-name" id="fileImageName">No file chosen</span>
+        <input type="file" id="fileImage" accept="image/*" aria-label="Select image file">
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <h3 class="flow-step-title"><span class="flow-num">2</span>Edit image (optional)</h3>
+      <div id="imageEditArea" style="margin-top:0.65rem;">
+        <div id="imageEditQuick" class="quick-choice" style="display:none;">
+          <div class="actions">
+            <button type="button" id="quickUseOriginal">No editing</button>
+            <button type="button" id="quickCropOnly">Crop only</button>
+            <button type="button" id="quickAdvanced">Advanced editing</button>
+          </div>
+        </div>
+
+        <div id="imageEditPanel" class="image-edit-panel" style="display:none;">
+      <div class="edit-panel-header">
+        <div class="edit-panel-header-left" id="editPanelHeaderLeft">
+          <span class="step-badge" id="editStepBadge">1/3</span>
+        </div>
+        <div class="edit-panel-header-actions">
+          <button type="button" id="editBackToQuick">Back to choices</button>
+          <button type="button" id="editUseOriginal">Use original image</button>
+          <button type="button" id="editRestart" style="display:none;">Start over</button>
+        </div>
+      </div>
+      <div id="editStep1">
+        <h3 id="editStep1Heading" class="edit-step-title">Crop &amp; rotate</h3>
+        <div id="editStep1Actions" class="edit-step1-foot">
+          <div class="edit-toolbar edit-toolbar--rotate">
+            <button type="button" id="step1RotateLeft">90° left</button>
+            <button type="button" id="step1RotateRight">90° right</button>
+          </div>
+          <div class="edit-toolbar edit-toolbar--advance">
+            <button type="button" id="step1Skip">Skip</button>
+            <button type="button" id="step1Next" class="edit-btn-primary">Next</button>
+          </div>
+        </div>
+        <div class="cropper-wrap"><img id="cropperTarget" alt=""></div>
+      </div>
+      <div id="editStepBg" style="display:none;">
+        <h3 class="edit-step-title">Background removal (optional)</h3>
+        <p class="edit-hint">Removing the background can make it easier to pick up subject lines and stabilize route detection. <strong>Remove background automatically</strong> uses AI to estimate and separate the background. Paint over any remaining areas with the brush to erase them like an eraser.</p>
+        <div class="edit-step-bg-tools" style="margin:0.5rem 0;">
+          <div class="edit-toolbar" style="margin:0.35rem 0 0.5rem 0;">
+            <button type="button" id="bgAutoRemove">Remove background automatically</button>
+          </div>
+          <div class="option-row">
+            <label for="bgBrushSize">Brush size</label>
+            <input type="range" id="bgBrushSize" min="4" max="80" value="22">
+            <span class="value" id="bgBrushSizeVal">22</span>
+          </div>
+        </div>
+        <div class="edit-toolbar">
+          <button type="button" id="stepBgBack">Back</button>
+          <button type="button" id="stepBgSkipToTone">Next</button>
+        </div>
+        <div id="bgMaskOuterWrap" class="bg-preview-wrap bg-mask-stage">
+          <div id="bgMaskStage" class="bg-mask-inner">
+            <img id="bgPreviewImg" alt="" style="display:none;">
+            <canvas id="bgMaskBase" aria-label="Mask"></canvas>
+            <div id="bgBrushCursor" class="bg-brush-cursor" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+      <div id="editStep2" style="display:none;">
+        <h3 class="edit-step-title">Brightness &amp; contrast</h3>
+        <p class="edit-hint">Pick a background color that is not used in the subject outline, then adjust background color and tone so the boundary lines are clearly visible.</p>
+        <div class="option-row">
+          <label for="bgCompositeColor">Background color</label>
+          <input type="color" id="bgCompositeColor" value="#ffffff">
+        </div>
+        <div class="option-row">
+          <label for="toneBrightness">Brightness</label>
+          <input type="range" id="toneBrightness" min="50" max="150" value="100">
+          <span class="value" id="toneBrightnessVal">100</span>
+        </div>
+        <div class="option-row">
+          <label for="toneContrast">Contrast</label>
+          <input type="range" id="toneContrast" min="50" max="150" value="100">
+          <span class="value" id="toneContrastVal">100</span>
+        </div>
+        <div class="edit-toolbar">
+          <button type="button" id="stepToneBack">Back</button>
+          <button type="button" id="editFinalize" class="edit-btn-primary">Apply</button>
+        </div>
+        <div id="tonePreviewWrap" class="bg-preview-wrap bg-mask-stage" style="margin:0.5rem 0;"><img id="tonePreviewImg" alt="" style="max-width:100%;height:auto;display:block;border:0;"></div>
+      </div>
+      </div>
+      </div>
+      </div>
+    </div>
+
+    <div class="flow-step" id="flowStepRoute">
+      <h3 class="flow-step-title"><span class="flow-num">3</span>Route settings</h3>
+      <div class="options">
+      <div class="presets" style="margin-bottom:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+        <button type="button" id="presetLine">Line art (trace)</button>
+        <button type="button" id="presetPhoto">Photo (TSP)</button>
+      </div>
+      <div class="option-row">
+        <label for="routeMode">Route mode</label>
+        <select id="routeMode">
+          <option value="strokeTrace">Line art (stroke trace)</option>
+          <option value="density">Photo (density · TSP)</option>
+        </select>
+      </div>
+      <div class="option-row">
+        <label for="maxSize">Image size (long edge)</label>
+        <input type="range" id="maxSize" min="0" max="1000" step="100" value="0">
+        <span class="value" id="maxSizeVal">0 (native)</span>
+      </div>
+      <div class="option-row">
+        <label for="thresholdLow">Edge sensitivity (low)</label>
+        <input type="range" id="thresholdLow" min="10" max="255" value="50">
+        <span class="value" id="thresholdLowVal">50</span>
+      </div>
+      <div class="option-row">
+        <label for="thresholdHigh">Edge sensitivity (high)</label>
+        <input type="range" id="thresholdHigh" min="50" max="255" value="255">
+        <span class="value" id="thresholdHighVal">255</span>
+      </div>
+      <div class="option-row">
+        <label for="edgePreviewGradient">Gradient preview</label>
+        <input type="checkbox" id="edgePreviewGradient">
+      </div>
+      <div class="option-row">
+        <label for="maxPoints">Path points</label>
+        <input type="range" id="maxPoints" min="200" max="3500" step="100" value="1500">
+        <span class="value" id="maxPointsVal">1500</span>
+      </div>
+      <div class="option-row">
+        <label for="useCenterline">Ink centerline (line art)</label>
+        <input type="checkbox" id="useCenterline" checked>
+      </div>
+      <div class="option-row">
+        <label for="inkThreshold">Ink threshold (centerline)</label>
+        <input type="range" id="inkThreshold" min="50" max="250" value="200">
+        <span class="value" id="inkThresholdVal">200</span>
+      </div>
+      <div class="option-row">
+        <label for="thinEdges">Thin edges (when using Canny)</label>
+        <input type="checkbox" id="thinEdges">
+      </div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <h3 class="flow-step-title"><span class="flow-num">4</span>Preprocess &amp; edge preview</h3>
+      <div class="row">
+        <button type="button" id="previewProcess">Preview edges</button>
+      </div>
+    <div id="previewProcessArea" style="display:none; margin-top:0.75rem;">
+      <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-start;">
+        <div>
+          <span style="font-size:0.8rem;color:#555;">Gray</span>
+          <canvas id="previewGray"></canvas>
+        </div>
+        <div>
+          <span style="font-size:0.8rem;color:#555;" id="previewEdgeLabel">Edge</span>
+          <canvas id="previewEdge"></canvas>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div class="flow-step">
+      <h3 class="flow-step-title"><span class="flow-num">5</span>Create route</h3>
+      <div class="row">
+        <button type="button" id="runImage">Create route</button>
+      </div>
+    <p id="status1" style="font-size:0.9rem;color:#666;"></p>
+    <div id="preview1Area" style="display:none; margin-top:0.75rem;">
+      <div class="route-preview-heading">
+        <span id="routeCreateSpinner" class="route-spinner"></span>
+        <span id="routeCreateLoadingText" class="route-loading-text">…</span>
+      </div>
+      <canvas id="preview1"></canvas>
+      <div class="row" style="margin-top:0.5rem;">
+        <button type="button" id="downloadPng1" disabled>Save route as PNG</button>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div class="section" id="section2">
+    <h2>2. Apply route to FIT and save</h2>
+    <div class="row">
+      <label for="fileFit">FIT (route)</label>
+      <div class="file-input-row" style="margin-top:0.25rem;">
+        <button type="button" class="file-choose-btn" data-file-target="fileFit" aria-controls="fileFit">Choose file</button>
+        <span class="file-name" id="fileFitName">No file chosen</span>
+        <input type="file" id="fileFit" accept=".fit,application/octet-stream" aria-label="Select route FIT file">
+      </div>
+    </div>
+    <div class="row" id="sensorFitRow">
+      <label for="fileFitSensor">FIT (heart rate, optional)</label>
+      <div class="file-input-row" style="margin-top:0.25rem;">
+        <button type="button" class="file-choose-btn" data-file-target="fileFitSensor" aria-controls="fileFitSensor">Choose file</button>
+        <span class="file-name" id="fileFitSensorName">No file chosen</span>
+        <input type="file" id="fileFitSensor" accept=".fit,application/octet-stream" aria-label="Select optional heart-rate FIT file">
+      </div>
+    </div>
+    <div id="mapContainer"></div>
+    <div class="row" style="margin-top:0.5rem;">
+      <button type="button" id="runApply" disabled>Apply to FIT</button>
+    </div>
+    <div class="row" style="margin-top:0.5rem;">
+      <button type="button" id="downloadFit" disabled>Save FIT</button>
+    </div>
+    <p id="status2" style="font-size:0.9rem;color:#666;"></p>
+  </div>
+
+  <div id="log"></div>
+  <div id="processingOverlay" class="processing-overlay" style="display:none;"><p class="msg" id="processingOverlayMsg">…</p></div>
+
+  <script src="dist/track-remap.min.js"></script>
+  <script>
+    (function () {
+      let fitWorker = null;
+      let imageWorker = null;
+      try {
+        fitWorker = new Worker('dist/track-remap-worker.js');
+      } catch (_) { fitWorker = null; }
+      try {
+        imageWorker = new Worker('dist/track-remap-image-worker.js');
+      } catch (_) { imageWorker = null; }
+      const fileImage = document.getElementById('fileImage');
+      const fileFit = document.getElementById('fileFit');
+      const fileFitSensor = document.getElementById('fileFitSensor');
+      const fileImageName = document.getElementById('fileImageName');
+      const fileFitName = document.getElementById('fileFitName');
+      const fileFitSensorName = document.getElementById('fileFitSensorName');
+      const runImageBtn = document.getElementById('runImage');
+      const runApplyBtn = document.getElementById('runApply');
+      const sensorFitRow = document.getElementById('sensorFitRow');
+      const imageEditArea = document.getElementById('imageEditArea');
+      const status1 = document.getElementById('status1');
+      const status2 = document.getElementById('status2');
+      const section1 = document.getElementById('section1');
+      const section2 = document.getElementById('section2');
+      const downloadFitBtn = document.getElementById('downloadFit');
+      // image-only demo (no move-only mode)
+      const preview1Area = document.getElementById('preview1Area');
+      const preview1 = document.getElementById('preview1');
+      const routeCreateSpinner = document.getElementById('routeCreateSpinner');
+      const routeCreateLoadingText = document.getElementById('routeCreateLoadingText');
+      const downloadPng1Btn = document.getElementById('downloadPng1');
+      const logEl = document.getElementById('log');
+      const maxSizeInput = document.getElementById('maxSize');
+      const maxSizeVal = document.getElementById('maxSizeVal');
+      const thresholdLowInput = document.getElementById('thresholdLow');
+      const thresholdLowVal = document.getElementById('thresholdLowVal');
+      const thresholdHighInput = document.getElementById('thresholdHigh');
+      const thresholdHighVal = document.getElementById('thresholdHighVal');
+      const maxPointsInput = document.getElementById('maxPoints');
+      const maxPointsVal = document.getElementById('maxPointsVal');
+      const routeModeSelect = document.getElementById('routeMode');
+      const thinEdgesInput = document.getElementById('thinEdges');
+      const useCenterlineInput = document.getElementById('useCenterline');
+      const inkThresholdInput = document.getElementById('inkThreshold');
+      const inkThresholdVal = document.getElementById('inkThresholdVal');
+      const edgePreviewGradientInput = document.getElementById('edgePreviewGradient');
+      const previewEdgeLabel = document.getElementById('previewEdgeLabel');
+      const processingOverlayMsg = document.getElementById('processingOverlayMsg');
+      const previewProcessBtn = document.getElementById('previewProcess');
+      const previewProcessArea = document.getElementById('previewProcessArea');
+      const previewGray = document.getElementById('previewGray');
+      const previewEdge = document.getElementById('previewEdge');
+
+      const imageEditPanel = document.getElementById('imageEditPanel');
+      const imageEditQuick = document.getElementById('imageEditQuick');
+      const quickUseOriginal = document.getElementById('quickUseOriginal');
+      const quickCropOnly = document.getElementById('quickCropOnly');
+      const quickAdvanced = document.getElementById('quickAdvanced');
+      const editStepBadge = document.getElementById('editStepBadge');
+      const editStep1 = document.getElementById('editStep1');
+      const editStepBg = document.getElementById('editStepBg');
+      const editStep2 = document.getElementById('editStep2');
+      const cropperTarget = document.getElementById('cropperTarget');
+      const bgPreviewImg = document.getElementById('bgPreviewImg');
+      const bgMaskBase = document.getElementById('bgMaskBase');
+      const bgMaskOuterWrap = document.getElementById('bgMaskOuterWrap');
+      const bgCompositeColor = document.getElementById('bgCompositeColor');
+      const tonePreviewWrap = document.getElementById('tonePreviewWrap');
+      const bgBrushSize = document.getElementById('bgBrushSize');
+      const bgBrushSizeVal = document.getElementById('bgBrushSizeVal');
+      const bgMaskStage = document.getElementById('bgMaskStage');
+      const bgAutoRemove = document.getElementById('bgAutoRemove');
+      const bgBrushCursor = document.getElementById('bgBrushCursor');
+      const processingOverlay = document.getElementById('processingOverlay');
+      const stepBgSkipToTone = document.getElementById('stepBgSkipToTone');
+      const tonePreviewImg = document.getElementById('tonePreviewImg');
+      const toneBrightness = document.getElementById('toneBrightness');
+      const toneContrast = document.getElementById('toneContrast');
+      const toneBrightnessVal = document.getElementById('toneBrightnessVal');
+      const toneContrastVal = document.getElementById('toneContrastVal');
+      const editUseOriginalBtn = document.getElementById('editUseOriginal');
+      const editRestartBtn = document.getElementById('editRestart');
+      const editPanelHeaderLeft = document.getElementById('editPanelHeaderLeft');
+      const editBackToQuick = document.getElementById('editBackToQuick');
+      const editStep1Heading = document.getElementById('editStep1Heading');
+      const editStep1Actions = document.getElementById('editStep1Actions');
+      const step1RotateLeft = document.getElementById('step1RotateLeft');
+      const step1RotateRight = document.getElementById('step1RotateRight');
+      const step1Skip = document.getElementById('step1Skip');
+      const step1Next = document.getElementById('step1Next');
+      const editFinalize = document.getElementById('editFinalize');
+
+      let cropperInstance = null;
+      let objectUrls = [];
+      let workingBlob = null;
+      let toneSourceBlob = null;
+      let resolvedRouteFile = null;
+      let editChoice = '';
+      let imagePathResult = null;
+      let cachedPreprocessedGray = null;
+      let cachedPreprocessKey = '';
+
+      let maskFullW = 0;
+      let maskFullH = 0;
+      let maskDispW = 0;
+      let maskDispH = 0;
+      let maskPaintDown = false;
+      let brushCursorLastX = 0;
+      let brushCursorLastY = 0;
+      let maskLastX = 0;
+      let maskLastY = 0;
+      let stepBgSnapshotBlob = null;
+      let tonePreviewDebounceTimer = null;
+
+      const BG_REMOVAL_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm';
+
+      function scrollToStep3() {
+        const el = document.getElementById('flowStepRoute');
+        if (el && el.scrollIntoView) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+
+      function setRoutePreviewLoading(active) {
+        if (routeCreateSpinner) {
+          routeCreateSpinner.classList.toggle('is-active', !!active);
+        }
+        if (routeCreateLoadingText) {
+          routeCreateLoadingText.classList.toggle('is-active', !!active);
+        }
+      }
+
+      function showQuickChoiceUI(fileSelected) {
+        if (!imageEditQuick) return;
+        imageEditQuick.style.display = fileSelected ? 'block' : 'none';
+      }
+
+      function backToQuickChoice() {
+        if (!fileImage.files[0]) return;
+        resetChoiceAndState();
+        hideEditorPanel();
+        showQuickChoiceUI(true);
+      }
+
+      function hideEditorPanel() {
+        imageEditPanel.style.display = 'none';
+        hideBrushCursorOverlay();
+      }
+
+      function showEditorPanel() {
+        imageEditPanel.style.display = 'block';
+      }
+
+      function setStep1ButtonLabelsForChoice() {
+        if (editChoice === 'cropOnly') {
+          step1Next.textContent = 'Confirm';
+        } else {
+          step1Skip.textContent = 'Skip';
+          step1Next.textContent = 'Next';
+        }
+      }
+
+      function syncEditModeChrome() {
+        const crop = editChoice === 'cropOnly';
+        const adv = editChoice === 'advanced';
+        if (editPanelHeaderLeft) {
+          editPanelHeaderLeft.style.display = crop ? 'none' : '';
+        }
+        if (editBackToQuick) {
+          editBackToQuick.style.display = crop ? 'inline-block' : 'none';
+        }
+        if (editUseOriginalBtn) {
+          editUseOriginalBtn.style.display = crop ? 'none' : 'inline-block';
+        }
+        if (editStep1Heading) {
+          editStep1Heading.textContent = 'Crop & rotate';
+        }
+        if (editStepBadge) {
+          editStepBadge.style.display = crop ? 'none' : 'inline-flex';
+        }
+        if (editRestartBtn) {
+          if (crop || adv) {
+            editRestartBtn.style.display = 'inline-block';
+            editRestartBtn.textContent = 'Start over';
+          } else {
+            editRestartBtn.style.display = 'none';
+          }
+        }
+        if (step1Skip) {
+          step1Skip.style.display = crop ? 'none' : 'inline-block';
+        }
+      }
+
+      function revokeObjectUrls() {
+        objectUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (_) {} });
+        objectUrls = [];
+      }
+
+      function destroyCropperIfAny() {
+        if (cropperInstance) {
+          cropperInstance.destroy();
+          cropperInstance = null;
+        }
+      }
+
+      function getBgCompositeColor() {
+        return (bgCompositeColor && bgCompositeColor.value) ? bgCompositeColor.value : '#ffffff';
+      }
+
+      function syncBgColorWrappers() {
+        const c = getBgCompositeColor();
+        if (tonePreviewWrap) tonePreviewWrap.style.backgroundColor = c;
+        if (bgMaskOuterWrap) bgMaskOuterWrap.style.backgroundColor = c;
+      }
+
+      function getRouteFileAsync() {
+        const f = fileImage.files[0];
+        if (!f) return Promise.resolve(null);
+        if (resolvedRouteFile) return Promise.resolve(resolvedRouteFile);
+        if (workingBlob) {
+          return compositeAlphaOnColor(workingBlob, getBgCompositeColor()).then(function (opaque) {
+            return new File([opaque], 'working.png', { type: 'image/png' });
+          });
+        }
+        return Promise.resolve(f);
+      }
+
+      function resetChoiceAndState() {
+        destroyCropperIfAny();
+        revokeObjectUrls();
+        resolvedRouteFile = null;
+        workingBlob = null;
+        toneSourceBlob = null;
+        editChoice = '';
+        cachedPreprocessedGray = null;
+        cachedPreprocessKey = '';
+      }
+
+      function useOriginalAndGuideNext() {
+        const file = fileImage.files[0];
+        if (!file) return;
+        destroyCropperIfAny();
+        revokeObjectUrls();
+        resolvedRouteFile = file;
+        workingBlob = null;
+        toneSourceBlob = null;
+        cachedPreprocessedGray = null;
+        cachedPreprocessKey = '';
+        hideEditorPanel();
+        editChoice = '';
+        showQuickChoiceUI(true);
+        scrollToStep3();
+      }
+
+      function finalizeFromWorkingBlob(blob, badgeText) {
+        if (!blob) return Promise.resolve(null);
+        return compositeAlphaOnColor(blob, getBgCompositeColor()).then(function (opaque) {
+          resolvedRouteFile = new File([opaque], 'edited.png', { type: 'image/png' });
+          cachedPreprocessedGray = null;
+          cachedPreprocessKey = '';
+          revokeObjectUrls();
+          const u = URL.createObjectURL(opaque);
+          objectUrls.push(u);
+          cropperTarget.src = u;
+          cropperTarget.style.display = 'block';
+          if (editStep1Actions) {
+            editStep1Actions.style.display = 'none';
+          }
+          imageEditPanel.style.display = 'block';
+          editStepBadge.textContent = badgeText || 'Finalized';
+          showQuickChoiceUI(true);
+          scrollToStep3();
+          return resolvedRouteFile;
+        });
+      }
+
+      function fileToPngBlob(file) {
+        return createImageBitmap(file).then(function (bitmap) {
+          const c = document.createElement('canvas');
+          c.width = bitmap.width;
+          c.height = bitmap.height;
+          c.getContext('2d').drawImage(bitmap, 0, 0);
+          bitmap.close();
+          return new Promise(function (resolve) {
+            c.toBlob(function (b) { resolve(b); }, 'image/png');
+          });
+        });
+      }
+
+      function applyToneToBlob(blob, brightnessPct, contrastPct) {
+        return createImageBitmap(blob).then(function (bitmap) {
+          const c = document.createElement('canvas');
+          c.width = bitmap.width;
+          c.height = bitmap.height;
+          const ctx = c.getContext('2d');
+          ctx.clearRect(0, 0, c.width, c.height);
+          ctx.filter = 'brightness(' + brightnessPct + '%) contrast(' + contrastPct + '%)';
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          return new Promise(function (resolve) {
+            c.toBlob(function (out) { resolve(out); }, 'image/png');
+          });
+        });
+      }
+
+      function initMaskPaintFromBlob(blob) {
+        return createImageBitmap(blob).then(function (bitmap) {
+          try {
+            stepBgSnapshotBlob = blob.slice(0, blob.size, blob.type);
+          } catch (_) {
+            stepBgSnapshotBlob = blob;
+          }
+          maskFullW = bitmap.width;
+          maskFullH = bitmap.height;
+          const maxSide = 1024;
+          const scale = Math.min(1, maxSide / Math.max(maskFullW, maskFullH));
+          maskDispW = Math.max(1, Math.round(maskFullW * scale));
+          maskDispH = Math.max(1, Math.round(maskFullH * scale));
+          bgMaskBase.width = maskDispW;
+          bgMaskBase.height = maskDispH;
+          const bctx = bgMaskBase.getContext('2d');
+          bctx.clearRect(0, 0, maskDispW, maskDispH);
+          bctx.drawImage(bitmap, 0, 0, maskDispW, maskDispH);
+          bitmap.close();
+        });
+      }
+
+      function maskStageCoords(clientX, clientY) {
+        const rect = bgMaskBase.getBoundingClientRect();
+        const sx = bgMaskBase.width / rect.width;
+        const sy = bgMaskBase.height / rect.height;
+        return {
+          x: (clientX - rect.left) * sx,
+          y: (clientY - rect.top) * sy,
+        };
+      }
+
+      function syncWorkingBlobFromCanvas() {
+        return new Promise(function (resolve) {
+          if (!bgMaskBase.width || !bgMaskBase.height) {
+            resolve(workingBlob);
+            return;
+          }
+          bgMaskBase.toBlob(function (b) {
+            resolve(b || workingBlob);
+          }, 'image/png');
+        });
+      }
+
+      function hideBrushCursorOverlay() {
+        if (!bgBrushCursor) return;
+        bgBrushCursor.style.display = 'none';
+      }
+
+      function updateBrushCursorOverlay(clientX, clientY) {
+        if (clientX != null && clientY != null) {
+          brushCursorLastX = clientX;
+          brushCursorLastY = clientY;
+        }
+        if (!bgBrushCursor || !editStepBg || editStepBg.style.display === 'none') {
+          hideBrushCursorOverlay();
+          return;
+        }
+        if (!bgMaskBase.width || !bgMaskBase.height) {
+          hideBrushCursorOverlay();
+          return;
+        }
+        const rect = bgMaskBase.getBoundingClientRect();
+        if (
+          clientX < rect.left ||
+          clientX > rect.right ||
+          clientY < rect.top ||
+          clientY > rect.bottom
+        ) {
+          hideBrushCursorOverlay();
+          return;
+        }
+        const stageRect = bgMaskStage.getBoundingClientRect();
+        const brushPx = parseInt(bgBrushSize.value, 10) || 22;
+        const scale = rect.width / bgMaskBase.width;
+        const d = Math.max(2, brushPx * scale);
+        const x = clientX - stageRect.left;
+        const y = clientY - stageRect.top;
+        bgBrushCursor.style.display = 'block';
+        bgBrushCursor.style.width = d + 'px';
+        bgBrushCursor.style.height = d + 'px';
+        bgBrushCursor.style.left = x + 'px';
+        bgBrushCursor.style.top = y + 'px';
+      }
+
+      function maskEraseLine(x0, y0, x1, y1) {
+        const ctx = bgMaskBase.getContext('2d');
+        const w = parseInt(bgBrushSize.value, 10) || 22;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+        ctx.lineWidth = w;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function bindMaskPaintEvents() {
+        function endStroke() {
+          if (!maskPaintDown) return;
+          maskPaintDown = false;
+          document.removeEventListener('mousemove', move);
+          document.removeEventListener('mouseup', endStroke);
+          document.removeEventListener('touchmove', move);
+          document.removeEventListener('touchend', endStroke);
+        }
+        function move(e) {
+          if (!maskPaintDown) return;
+          const cx = e.clientX != null ? e.clientX : (e.touches && e.touches[0].clientX);
+          const cy = e.clientY != null ? e.clientY : (e.touches && e.touches[0].clientY);
+          updateBrushCursorOverlay(cx, cy);
+          const o = maskStageCoords(cx, cy);
+          maskEraseLine(maskLastX, maskLastY, o.x, o.y);
+          maskLastX = o.x;
+          maskLastY = o.y;
+          if (e.type === 'touchmove') e.preventDefault();
+        }
+        function down(e) {
+          if (e.button != null && e.button !== 0) return;
+          maskPaintDown = true;
+          const cx = e.clientX != null ? e.clientX : (e.touches && e.touches[0].clientX);
+          const cy = e.clientY != null ? e.clientY : (e.touches && e.touches[0].clientY);
+          const o = maskStageCoords(cx, cy);
+          maskLastX = o.x;
+          maskLastY = o.y;
+          document.addEventListener('mousemove', move);
+          document.addEventListener('mouseup', endStroke);
+          document.addEventListener('touchmove', move, { passive: false });
+          document.addEventListener('touchend', endStroke);
+          if (e.type === 'touchstart') e.preventDefault();
+        }
+        bgMaskStage.addEventListener('mousedown', down);
+        bgMaskStage.addEventListener('touchstart', down, { passive: false });
+        bgMaskStage.addEventListener('mousemove', function (e) {
+          updateBrushCursorOverlay(e.clientX, e.clientY);
+        });
+        bgMaskStage.addEventListener('mouseleave', function () {
+          hideBrushCursorOverlay();
+        });
+      }
+      bindMaskPaintEvents();
+
+      function runAutoRemoveBackground() {
+        if (!workingBlob) {
+          log('Auto background removal: no image');
+          return;
+        }
+        bgAutoRemove.disabled = true;
+        processingOverlayMsg.textContent = '…';
+        processingOverlay.style.display = 'flex';
+        import(BG_REMOVAL_MODULE_URL)
+          .then(function (mod) {
+            const removeBackground = mod.removeBackground;
+            if (typeof removeBackground !== 'function') {
+              throw new Error('removeBackground is not available');
+            }
+            return removeBackground(workingBlob, {
+              progress: function (key, current, total) {
+                processingOverlayMsg.textContent = 'Removing background: ' + String(key) + ' ' + current + '/' + total;
+              },
+            });
+          })
+          .then(function (outBlob) {
+            workingBlob = outBlob;
+            cachedPreprocessedGray = null;
+            cachedPreprocessKey = '';
+            return initMaskPaintFromBlob(workingBlob);
+          })
+          .then(function () {
+            log('Applied automatic background removal');
+          })
+          .catch(function (err) {
+            log('Automatic background removal: ' + (err && err.message ? err.message : String(err)));
+          })
+          .finally(function () {
+            processingOverlay.style.display = 'none';
+            bgAutoRemove.disabled = false;
+          });
+      }
+
+      bgAutoRemove.addEventListener('click', function () {
+        runAutoRemoveBackground();
+      });
+
+      bgBrushSize.addEventListener('input', function () {
+        bgBrushSizeVal.textContent = bgBrushSize.value;
+        updateBrushCursorOverlay(brushCursorLastX, brushCursorLastY);
+      });
+
+      bgCompositeColor.addEventListener('input', function () {
+        syncBgColorWrappers();
+        scheduleTonePreviewRefresh();
+      });
+      syncBgColorWrappers();
+
+      function compositeAlphaOnColor(blob, colorCss) {
+        const fill = colorCss || '#ffffff';
+        return createImageBitmap(blob).then(function (bitmap) {
+          const c = document.createElement('canvas');
+          c.width = bitmap.width;
+          c.height = bitmap.height;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = fill;
+          ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          return new Promise(function (resolve) {
+            c.toBlob(function (out) { resolve(out); }, 'image/png');
+          });
+        });
+      }
+
+      function showWorkingOnTonePreview(blob) {
+        revokeObjectUrls();
+        const u = URL.createObjectURL(blob);
+        objectUrls.push(u);
+        tonePreviewImg.src = u;
+        syncBgColorWrappers();
+        tonePreviewImg.style.filter = 'none';
+      }
+
+      function refreshToneCompositePreview() {
+        if (!toneSourceBlob) return Promise.resolve(false);
+        if (!editStep2 || editStep2.style.display === 'none') return Promise.resolve(false);
+        const b = parseInt(toneBrightness.value, 10) || 100;
+        const c = parseInt(toneContrast.value, 10) || 100;
+        return applyToneToBlob(toneSourceBlob, b, c)
+          .then(function (blob) {
+            workingBlob = blob;
+            return compositeAlphaOnColor(blob, getBgCompositeColor());
+          })
+          .then(function (opaque) {
+            resolvedRouteFile = new File([opaque], 'edited.png', { type: 'image/png' });
+            showWorkingOnTonePreview(opaque);
+            return true;
+          })
+          .catch(function (err) {
+            log('Tone adjustment: ' + (err && err.message ? err.message : String(err)));
+            return false;
+          });
+      }
+
+      function scheduleTonePreviewRefresh() {
+        if (!toneSourceBlob || !editStep2 || editStep2.style.display === 'none') return;
+        if (tonePreviewDebounceTimer) clearTimeout(tonePreviewDebounceTimer);
+        tonePreviewDebounceTimer = setTimeout(function () {
+          tonePreviewDebounceTimer = null;
+          refreshToneCompositePreview();
+        }, 120);
+      }
+
+      function goToStepBg() {
+        if (editChoice !== 'advanced') {
+          return;
+        }
+        editStep1.style.display = 'none';
+        editStepBg.style.display = 'block';
+        editStep2.style.display = 'none';
+        editStepBadge.textContent = '2/3';
+        editRestartBtn.style.display = 'inline-block';
+        revokeObjectUrls();
+        hideBrushCursorOverlay();
+        initMaskPaintFromBlob(workingBlob).catch(function (err) {
+          log('Preview init: ' + (err && err.message ? err.message : String(err)));
+        });
+        syncBgColorWrappers();
+      }
+
+      function goToStepTone() {
+        if (editChoice !== 'advanced') {
+          return;
+        }
+        editStep1.style.display = 'none';
+        hideBrushCursorOverlay();
+        editStepBg.style.display = 'none';
+        editStep2.style.display = 'block';
+        editStepBadge.textContent = '3/3';
+        editRestartBtn.style.display = 'inline-block';
+        toneBrightness.value = 100;
+        toneContrast.value = 100;
+        toneBrightnessVal.textContent = '100';
+        toneContrastVal.textContent = '100';
+        if (workingBlob) {
+          try {
+            toneSourceBlob = workingBlob.slice(0, workingBlob.size, workingBlob.type);
+          } catch (_) {
+            toneSourceBlob = workingBlob;
+          }
+        } else {
+          toneSourceBlob = null;
+        }
+        refreshToneCompositePreview();
+      }
+
+      function goBackToStep1() {
+        if (!workingBlob) {
+          log('No image data to return to step 1');
+          return;
+        }
+        destroyCropperIfAny();
+        revokeObjectUrls();
+        editStep1.style.display = 'block';
+        hideBrushCursorOverlay();
+        editStepBg.style.display = 'none';
+        editStep2.style.display = 'none';
+        editStepBadge.textContent = '1/3';
+        editRestartBtn.style.display = 'inline-block';
+        cachedPreprocessedGray = null;
+        cachedPreprocessKey = '';
+        const u = URL.createObjectURL(workingBlob);
+        objectUrls.push(u);
+        cropperTarget.src = u;
+        cropperTarget.onload = function () {
+          cropperTarget.onload = null;
+          cropperInstance = new Cropper(cropperTarget, {
+            viewMode: 1,
+            autoCropArea: 0.92,
+            responsive: true,
+          });
+        };
+      }
+
+      function goBackToStep2() {
+        const base = toneSourceBlob || workingBlob;
+        if (!base) {
+          log('No image data to return to step 2');
+          return;
+        }
+        try {
+          workingBlob = base.slice(0, base.size, base.type);
+        } catch (_) {
+          workingBlob = base;
+        }
+        revokeObjectUrls();
+        editStep1.style.display = 'none';
+        editStepBg.style.display = 'block';
+        editStep2.style.display = 'none';
+        editStepBadge.textContent = '2/3';
+        editRestartBtn.style.display = 'inline-block';
+        cachedPreprocessedGray = null;
+        cachedPreprocessKey = '';
+        hideBrushCursorOverlay();
+        initMaskPaintFromBlob(workingBlob).catch(function (err) {
+          log('Preview init: ' + (err && err.message ? err.message : String(err)));
+        });
+        syncBgColorWrappers();
+      }
+
+      function resetEditUIFromFile() {
+        const file = fileImage.files[0];
+        if (!file) return;
+        destroyCropperIfAny();
+        revokeObjectUrls();
+        resolvedRouteFile = null;
+        workingBlob = null;
+        toneSourceBlob = null;
+        editStep1.style.display = 'block';
+        hideBrushCursorOverlay();
+        editStepBg.style.display = 'none';
+        editStep2.style.display = 'none';
+        editStepBadge.textContent = '1/3';
+        if (editStep1Actions) {
+          editStep1Actions.style.display = '';
+        }
+        setStep1ButtonLabelsForChoice();
+        syncEditModeChrome();
+        const u = URL.createObjectURL(file);
+        objectUrls.push(u);
+        cropperTarget.src = u;
+        cropperTarget.onload = function () {
+          cropperTarget.onload = null;
+          cropperInstance = new Cropper(cropperTarget, {
+            viewMode: 1,
+            autoCropArea: 0.92,
+            responsive: true,
+          });
+        };
+      }
+
+      editUseOriginalBtn.addEventListener('click', function () {
+        useOriginalAndGuideNext();
+      });
+
+      editRestartBtn.addEventListener('click', function () {
+        if (!fileImage.files[0]) return;
+        resolvedRouteFile = null;
+        workingBlob = null;
+        toneSourceBlob = null;
+        cachedPreprocessedGray = null;
+        cachedPreprocessKey = '';
+        imageEditPanel.style.display = 'block';
+        resetEditUIFromFile();
+      });
+
+      if (editBackToQuick) {
+        editBackToQuick.addEventListener('click', backToQuickChoice);
+      }
+
+      step1RotateLeft.addEventListener('click', function () {
+        if (cropperInstance) cropperInstance.rotate(-90);
+      });
+      step1RotateRight.addEventListener('click', function () {
+        if (cropperInstance) cropperInstance.rotate(90);
+      });
+
+      step1Skip.addEventListener('click', function () {
+        const file = fileImage.files[0];
+        if (!file) return;
+        if (editChoice === 'cropOnly') {
+          return;
+        }
+        fileToPngBlob(file).then(function (blob) {
+          workingBlob = blob;
+          goToStepBg();
+        }).catch(function (err) {
+          log('Step 1 skip: ' + (err && err.message ? err.message : String(err)));
+        });
+      });
+
+      step1Next.addEventListener('click', function () {
+        if (!cropperInstance) return;
+        const canvas = cropperInstance.getCroppedCanvas({
+          maxWidth: 4096,
+          maxHeight: 4096,
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: 'high',
+        });
+        if (!canvas) {
+          log('Could not get crop region');
+          return;
+        }
+        canvas.toBlob(function (blob) {
+          if (!blob) {
+            log('Failed to export image');
+            return;
+          }
+          workingBlob = blob;
+          destroyCropperIfAny();
+          cropperTarget.src = '';
+          if (editChoice === 'cropOnly') {
+            finalizeFromWorkingBlob(blob, 'Crop confirmed');
+            return;
+          }
+          goToStepBg();
+        }, 'image/png');
+      });
+
+      stepBgSkipToTone.addEventListener('click', function () {
+        syncWorkingBlobFromCanvas().then(function (b) {
+          workingBlob = b;
+          cachedPreprocessedGray = null;
+          cachedPreprocessKey = '';
+          goToStepTone();
+        });
+      });
+
+      document.getElementById('stepBgBack').addEventListener('click', function () {
+        syncWorkingBlobFromCanvas().then(function (b) {
+          workingBlob = b;
+          goBackToStep1();
+        });
+      });
+
+      document.getElementById('stepToneBack').addEventListener('click', function () {
+        goBackToStep2();
+      });
+
+      toneBrightness.addEventListener('input', function () {
+        toneBrightnessVal.textContent = toneBrightness.value;
+        scheduleTonePreviewRefresh();
+      });
+      toneContrast.addEventListener('input', function () {
+        toneContrastVal.textContent = toneContrast.value;
+        scheduleTonePreviewRefresh();
+      });
+
+      editFinalize.addEventListener('click', function () {
+        if (!toneSourceBlob) return;
+        refreshToneCompositePreview().then(function (ok) {
+          if (!ok) return;
+          editStep1.style.display = 'none';
+          hideBrushCursorOverlay();
+          editStepBg.style.display = 'none';
+          editStep2.style.display = 'block';
+          editStepBadge.textContent = 'Finalized';
+          editRestartBtn.style.display = 'inline-block';
+          cachedPreprocessedGray = null;
+          cachedPreprocessKey = '';
+          showQuickChoiceUI(true);
+          scrollToStep3();
+        });
+      });
+
+      function preprocessCacheKey(opts) {
+        const base = String(opts.maxSize) + '|rm:' + (opts.routeMode || 'density');
+        const f = fileImage.files[0];
+        const bg = getBgCompositeColor();
+        if (!f) return base + '|bg:' + bg;
+        if (resolvedRouteFile) {
+          return base + '|r:' + resolvedRouteFile.size + '|' + resolvedRouteFile.lastModified + '|bg:' + bg;
+        }
+        if (workingBlob) {
+          return base + '|w:' + workingBlob.size + '|bg:' + bg;
+        }
+        return base + '|o:' + f.size + '|' + f.lastModified + '|bg:' + bg;
+      }
+
+      function edgePreviewOptions(opts, gradientPreview) {
+        const o = {
+          routeMode: opts.routeMode || 'density',
+          thresholdLow: opts.thresholdLow,
+          thresholdHigh: opts.thresholdHigh,
+          thinEdges: opts.thinEdges,
+          useCenterline: opts.useCenterline,
+          inkThreshold: opts.inkThreshold,
+        };
+        if (gradientPreview) {
+          o.edgePreviewStyle = 'gradient';
+        }
+        return o;
+      }
+
+      function drawRgbaToCanvas(canvas, rgbaObj) {
+        const { data, width, height } = rgbaObj;
+        const scale = Math.min(360 / width, 360 / height, 1);
+        const cw = Math.max(1, Math.round(width * scale));
+        const ch = Math.max(1, Math.round(height * scale));
+        const src = document.createElement('canvas');
+        src.width = width;
+        src.height = height;
+        src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#eee';
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.drawImage(src, 0, 0, cw, ch);
+      }
+
+      fileImage.addEventListener('change', function () {
+        setFileName(fileImageName, fileImage.files && fileImage.files[0]);
+        cachedPreprocessedGray = null;
+        cachedPreprocessKey = '';
+        previewProcessArea.style.display = 'none';
+        if (fileImage.files[0]) {
+          resetChoiceAndState();
+          hideEditorPanel();
+          showQuickChoiceUI(true);
+        } else {
+          hideEditorPanel();
+          destroyCropperIfAny();
+          revokeObjectUrls();
+          resolvedRouteFile = null;
+          workingBlob = null;
+          toneSourceBlob = null;
+          editChoice = '';
+          showQuickChoiceUI(false);
+        }
+      });
+
+      fileFit.addEventListener('change', function () {
+        setFileName(fileFitName, fileFit.files && fileFit.files[0]);
+        const hasFit = !!(fileFit.files && fileFit.files[0]);
+      });
+      fileFitSensor.addEventListener('change', function () {
+        setFileName(fileFitSensorName, fileFitSensor.files && fileFitSensor.files[0]);
+      });
+
+      setFileName(fileImageName, fileImage.files && fileImage.files[0]);
+      setFileName(fileFitName, fileFit.files && fileFit.files[0]);
+      setFileName(fileFitSensorName, fileFitSensor.files && fileFitSensor.files[0]);
+
+      quickUseOriginal.addEventListener('click', function () {
+        useOriginalAndGuideNext();
+      });
+
+      quickCropOnly.addEventListener('click', function () {
+        if (!fileImage.files[0]) return;
+        editChoice = 'cropOnly';
+        showQuickChoiceUI(true);
+        showEditorPanel();
+        resetEditUIFromFile();
+        editStepBg.style.display = 'none';
+        editStep2.style.display = 'none';
+      });
+
+      quickAdvanced.addEventListener('click', function () {
+        if (!fileImage.files[0]) return;
+        editChoice = 'advanced';
+        showQuickChoiceUI(true);
+        showEditorPanel();
+        resetEditUIFromFile();
+      });
+
+      previewProcessBtn.addEventListener('click', function () {
+        getRouteFileAsync()
+          .then(function (file) {
+            if (!file) {
+              log('Please select an image');
+              return;
+            }
+            if (typeof TrackRemap === 'undefined' || !TrackRemap.imagePreprocessGrayFromFile) {
+              log('imagePreprocessGrayFromFile is not available (update the library)');
+              return;
+            }
+            const opts = getOptions();
+            previewProcessBtn.disabled = true;
+            log('…');
+            return TrackRemap.imagePreprocessGrayFromFile(file, opts)
+              .then(function (gray) {
+                cachedPreprocessedGray = gray;
+                cachedPreprocessKey = preprocessCacheKey(opts);
+                const gRgba = TrackRemap.imageGrayToRgba(gray);
+                const grad = edgePreviewGradientInput.checked;
+                const rm = opts.routeMode || 'density';
+                if (grad && rm !== 'density') {
+                  previewEdgeLabel.textContent = '—';
+                } else if (opts.useCenterline && grad) {
+                  previewEdgeLabel.textContent = '—';
+                } else if (grad) {
+                  previewEdgeLabel.textContent = 'Gradient';
+                } else if (rm === 'strokeTrace') {
+                  previewEdgeLabel.textContent = 'Centerline';
+                } else if (opts.useCenterline) {
+                  previewEdgeLabel.textContent = 'Centerline';
+                } else {
+                  previewEdgeLabel.textContent = 'Edge';
+                }
+                const eRgba = TrackRemap.imageEdgePreviewFromGray(gray, edgePreviewOptions(opts, grad && rm === 'density' && !opts.useCenterline));
+                drawRgbaToCanvas(previewGray, gRgba);
+                drawRgbaToCanvas(previewEdge, eRgba);
+                previewProcessArea.style.display = 'block';
+                log('');
+              });
+          })
+          .catch(function (err) {
+            log('Error: ' + (err && err.message ? err.message : String(err)));
+          })
+          .finally(function () {
+            previewProcessBtn.disabled = false;
+          });
+      });
+
+      let lastApplyResult = null;
+      const defaultMapCenter = { lat: 35.681236, lng: 139.767125 };
+      let selectedCenter = { lat: defaultMapCenter.lat, lng: defaultMapCenter.lng };
+      let map = null;
+      let centerMarker = null;
+      let routePolyline = null;
+
+      (function initMap() {
+        map = L.map('mapContainer').setView([defaultMapCenter.lat, defaultMapCenter.lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }).addTo(map);
+        centerMarker = L.marker([defaultMapCenter.lat, defaultMapCenter.lng]).addTo(map);
+        map.on('click', function (e) {
+          selectedCenter = { lat: e.latlng.lat, lng: e.latlng.lng };
+          if (centerMarker) map.removeLayer(centerMarker);
+          centerMarker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map);
+          if (map && typeof map.panTo === 'function') {
+            map.panTo([e.latlng.lat, e.latlng.lng]);
+          }
+        });
+      })();
+
+      function log(msg) { logEl.textContent = msg; }
+
+      function setFileName(el, file) {
+        if (!el) return;
+        el.textContent = file && file.name ? file.name : 'No file chosen';
+        if (file && file.name) el.title = file.name;
+        else el.removeAttribute('title');
+      }
+
+      document.querySelectorAll('[data-file-target]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const id = btn.getAttribute('data-file-target');
+          if (!id) return;
+          const input = document.getElementById(id);
+          if (input && typeof input.click === 'function') input.click();
+        });
+      });
+      function startProgressLog(prefix, startedAtMs) {
+        const timer = setInterval(function () {
+          const sec = ((performance.now() - startedAtMs) / 1000).toFixed(1);
+          log(prefix + ' in progress… ' + sec + ' s elapsed');
+        }, 2000);
+        return function stop() { clearInterval(timer); };
+      }
+
+      if (sensorFitRow) sensorFitRow.style.display = '';
+      if (section1) section1.style.display = '';
+      if (runApplyBtn) runApplyBtn.style.display = '';
+      if (imageEditArea) imageEditArea.style.display = '';
+      function getOptions() {
+        const maxSize = parseInt(maxSizeInput.value, 10) || 0;
+        return {
+          routeMode: routeModeSelect.value,
+          maxSize: maxSize === 0 ? 0 : maxSize,
+          thresholdLow: parseInt(thresholdLowInput.value, 10),
+          thresholdHigh: parseInt(thresholdHighInput.value, 10),
+          maxPoints: parseInt(maxPointsInput.value, 10),
+          thinEdges: thinEdgesInput.checked,
+          useCenterline: useCenterlineInput.checked,
+          inkThreshold: parseInt(inkThresholdInput.value, 10) || 200,
+        };
+      }
+      function syncCenterlineUi() {
+        const routeMode = routeModeSelect.value;
+        if (routeMode !== 'density') return;
+        const on = useCenterlineInput.checked;
+        thinEdgesInput.disabled = on;
+        thresholdLowInput.disabled = on;
+        thresholdHighInput.disabled = on;
+        inkThresholdInput.disabled = !on;
+      }
+      function syncRouteModeUi() {
+        const routeMode = routeModeSelect.value;
+        if (routeMode === 'strokeTrace') {
+          thinEdgesInput.disabled = true;
+          thresholdLowInput.disabled = true;
+          thresholdHighInput.disabled = true;
+          useCenterlineInput.disabled = true;
+          inkThresholdInput.disabled = false;
+        } else {
+          useCenterlineInput.disabled = false;
+          syncCenterlineUi();
+        }
+      }
+      function updateValueDisplays() {
+        maxSizeVal.textContent = maxSizeInput.value === '0' ? '0 (native)' : maxSizeInput.value;
+        thresholdLowVal.textContent = thresholdLowInput.value;
+        thresholdHighVal.textContent = thresholdHighInput.value;
+        maxPointsVal.textContent = maxPointsInput.value;
+        inkThresholdVal.textContent = inkThresholdInput.value;
+        syncRouteModeUi();
+      }
+      maxSizeInput.addEventListener('input', updateValueDisplays);
+      thresholdLowInput.addEventListener('input', updateValueDisplays);
+      thresholdHighInput.addEventListener('input', updateValueDisplays);
+      maxPointsInput.addEventListener('input', updateValueDisplays);
+      inkThresholdInput.addEventListener('input', updateValueDisplays);
+      useCenterlineInput.addEventListener('change', updateValueDisplays);
+      routeModeSelect.addEventListener('change', updateValueDisplays);
+      updateValueDisplays();
+      document.getElementById('presetLine').addEventListener('click', function () {
+        routeModeSelect.value = 'strokeTrace';
+        maxSizeInput.value = 0;
+        thresholdLowInput.value = 40;
+        thresholdHighInput.value = 255;
+        maxPointsInput.value = 1500;
+        useCenterlineInput.checked = true;
+        inkThresholdInput.value = 200;
+        updateValueDisplays();
+        log('Preset "Line art (trace)" applied (stroke trace, centerline-style mask)');
+      });
+      document.getElementById('presetPhoto').addEventListener('click', function () {
+        routeModeSelect.value = 'density';
+        maxSizeInput.value = 600;
+        thresholdLowInput.value = 80;
+        thresholdHighInput.value = 255;
+        maxPointsInput.value = 1500;
+        useCenterlineInput.checked = false;
+        updateValueDisplays();
+        log('Preset "Photo (TSP)" applied (long edge 600, density mode)');
+      });
+
+      function drawImageRoutePreview(canvas, path, w, h) {
+        const scale = Math.min(400 / w, 400 / h, 1);
+        const cw = Math.round(w * scale);
+        const ch = Math.round(h * scale);
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < path.length; i++) {
+          const x = path[i][0] * cw;
+          const y = path[i][1] * ch;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      function showImageResult(result) {
+        const elapsedSec = result.elapsedMs != null ? (result.elapsedMs / 1000).toFixed(2) : null;
+        imagePathResult = { path: result.path, width: result.width, height: result.height };
+        section1.classList.add('done');
+        const modeText = result.modeUsed ? (' [' + result.modeUsed + ']') : '';
+        const metricText = result.metrics ? (' / crossings:' + result.metrics.selfIntersections) : '';
+        const timeText = elapsedSec != null ? (' / time:' + elapsedSec + ' s') : '';
+        status1.textContent = result.path.length + ' pts' + modeText + metricText + timeText;
+        runApplyBtn.disabled = false;
+        lastApplyResult = null;
+        downloadFitBtn.disabled = true;
+        drawImageRoutePreview(preview1, result.path, result.width, result.height);
+        preview1Area.style.display = 'block';
+        downloadPng1Btn.disabled = false;
+        log('① done: ' + result.path.length + ' pts' + (elapsedSec != null ? (' / ' + elapsedSec + ' s') : ''));
+      }
+
+      runImageBtn.addEventListener('click', function () {
+        getRouteFileAsync().then(function (file) {
+          if (!file) { log('Please select an image'); return; }
+          if (typeof TrackRemap === 'undefined' || !TrackRemap.imageFromFile) {
+            log('TrackRemap is not loaded'); return;
+          }
+          const opts = getOptions();
+        const startedAt = performance.now();
+        const useCachedGray = cachedPreprocessedGray && preprocessCacheKey(opts) === cachedPreprocessKey;
+        log('① start mode=' + (opts.routeMode || 'density') + ', maxSize=' + opts.maxSize + (opts.routeMode === 'density' && opts.useCenterline ? (', centerline ink<' + opts.inkThreshold) : (opts.routeMode === 'density' ? (', low/high=' + opts.thresholdLow + '/' + opts.thresholdHigh) : (', ink<' + opts.inkThreshold))) + ', maxPoints=' + opts.maxPoints + (useCachedGray ? ' (preprocess cache)' : ''));
+        log('① creating route…');
+        const stopProgressLog = startProgressLog('① Create route', startedAt);
+        runImageBtn.disabled = true;
+        downloadPng1Btn.disabled = true;
+        preview1Area.style.display = 'block';
+        setRoutePreviewLoading(true);
+        preview1.width = 320;
+        preview1.height = 240;
+        const ctxInit = preview1.getContext('2d');
+        ctxInit.fillStyle = '#f0f2f5';
+        ctxInit.fillRect(0, 0, 320, 240);
+        const overlay = document.getElementById('processingOverlay');
+        processingOverlayMsg.textContent = '…';
+        overlay.style.display = 'flex';
+
+        function done() {
+          stopProgressLog();
+          runImageBtn.disabled = false;
+          overlay.style.display = 'none';
+          setRoutePreviewLoading(false);
+        }
+
+        function handleImageProgress(info) {
+          if (typeof info === 'string') {
+            const sec = ((performance.now() - startedAt) / 1000).toFixed(2);
+            log('① ' + info + ' (' + sec + ' s)');
+            return;
+          }
+          if (info.message) {
+            const sec = ((performance.now() - startedAt) / 1000).toFixed(2);
+            log('① ' + info.message + ' (' + sec + ' s)');
+          }
+          if (info.preview && info.preview.path) {
+            drawImageRoutePreview(preview1, info.preview.path, info.preview.width, info.preview.height);
+            downloadPng1Btn.disabled = false;
+          }
+        }
+
+        function attachImageWorkerHandler() {
+          imageWorker.onmessage = function (ev) {
+            const d = ev.data;
+            if (d.error) {
+              log('Error: ' + d.error);
+              done();
+              return;
+            }
+            if (d.path) {
+              showImageResult({
+                path: d.path,
+                width: d.width,
+                height: d.height,
+                modeUsed: d.modeUsed,
+                metrics: d.metrics,
+                elapsedMs: performance.now() - startedAt,
+              });
+              done();
+              return;
+            }
+            const sec = d.elapsedMs != null ? (d.elapsedMs / 1000).toFixed(2) : '?';
+            if (d.progress) {
+              log('① ' + d.progress + ' (' + sec + ' s)');
+            }
+            if (d.previewPath && d.width != null && d.height != null) {
+              drawImageRoutePreview(preview1, d.previewPath, d.width, d.height);
+              downloadPng1Btn.disabled = false;
+            }
+          };
+        }
+
+        if (imageWorker) {
+          attachImageWorkerHandler();
+          imageWorker.onerror = function () {
+            log('Worker error; retrying on main thread.');
+            if (useCachedGray && TrackRemap.imagePathFromGray) {
+              try {
+                const res = TrackRemap.imagePathFromGray(cachedPreprocessedGray, Object.assign({}, opts, { onProgress: handleImageProgress }));
+                showImageResult({ ...res, elapsedMs: performance.now() - startedAt });
+              } catch (err) {
+                log('Error: ' + (err && err.message ? err.message : String(err)));
+              }
+              done();
+              return;
+            }
+            TrackRemap.imageFromFile(file, Object.assign({}, opts, { onProgress: handleImageProgress }))
+              .then(function (res) {
+                showImageResult({ ...res, elapsedMs: performance.now() - startedAt });
+              })
+              .catch(function (err) {
+                log('Error: ' + (err && err.message ? err.message : String(err)));
+              })
+              .finally(done);
+          };
+          if (useCachedGray) {
+            const copy = cachedPreprocessedGray.data.slice();
+            imageWorker.postMessage({
+              task: 'pathFromGray',
+              grayData: copy.buffer,
+              width: cachedPreprocessedGray.width,
+              height: cachedPreprocessedGray.height,
+              options: opts,
+            }, [copy.buffer]);
+          } else {
+            file.arrayBuffer().then(function (imageArrayBuffer) {
+              imageWorker.postMessage({ imageArrayBuffer: imageArrayBuffer, options: opts }, [imageArrayBuffer]);
+            }).catch(function (err) {
+              log('Error: ' + (err && err.message ? err.message : String(err)));
+              done();
+            });
+          }
+        } else if (useCachedGray && TrackRemap.imagePathFromGray) {
+          try {
+            const res = TrackRemap.imagePathFromGray(cachedPreprocessedGray, Object.assign({}, opts, { onProgress: handleImageProgress }));
+            showImageResult({ ...res, elapsedMs: performance.now() - startedAt });
+          } catch (err) {
+            log('Error: ' + (err && err.message ? err.message : String(err)));
+          }
+          done();
+        } else {
+          TrackRemap.imageFromFile(file, Object.assign({}, opts, { onProgress: handleImageProgress }))
+            .then(function (res) { showImageResult({ ...res, elapsedMs: performance.now() - startedAt }); })
+            .catch(function (err) {
+              log('Error: ' + (err && err.message ? err.message : String(err)));
+            })
+            .finally(done);
+        }
+        }).catch(function (err) {
+          log('Image prep: ' + (err && err.message ? err.message : String(err)));
+        });
+      });
+
+      downloadPng1Btn.addEventListener('click', function () {
+        if (preview1.width < 2 || preview1.height < 2) return;
+        preview1.toBlob(function (blob) {
+          if (!blob) return;
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'image_route.png';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }, 'image/png');
+      });
+
+      function showApplyResult(result) {
+        const elapsedSec = result.elapsedMs != null ? (result.elapsedMs / 1000).toFixed(2) : null;
+        lastApplyResult = result;
+        section2.classList.add('done');
+        status2.textContent = 'Applied (' + result.appliedPoints.length + ' pts)' + (elapsedSec != null ? (' / ' + elapsedSec + ' s') : '');
+        downloadFitBtn.disabled = !result.fitBlob;
+        if (downloadFitBtn && downloadFitBtn.scrollIntoView) {
+          downloadFitBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        const pts = result.appliedPoints;
+        if (map && pts.length > 0) {
+          if (routePolyline) map.removeLayer(routePolyline);
+          const latlngs = pts.map(function (p) { return [p.lat, p.lng]; });
+          routePolyline = L.polyline(latlngs, { color: '#08f', weight: 4 }).addTo(map);
+          map.fitBounds(routePolyline.getBounds(), { padding: [20, 20] });
+        }
+        log('② done: wrote ' + pts.length + ' pts to FIT' + (elapsedSec != null ? (' / ' + elapsedSec + ' s') : ''));
+      }
+
+      function showShiftResult(result) {
+        const elapsedSec = result.elapsedMs != null ? (result.elapsedMs / 1000).toFixed(2) : null;
+        lastApplyResult = result;
+        section2.classList.add('done');
+        status2.textContent = 'Shifted (' + result.appliedPoints.length + ' pts)' + (elapsedSec != null ? (' / ' + elapsedSec + ' s') : '');
+        downloadFitBtn.disabled = !result.fitBlob;
+        const pts = result.appliedPoints;
+        if (map && pts.length > 0) {
+          if (routePolyline) map.removeLayer(routePolyline);
+          const latlngs = pts.map(function (p) { return [p.lat, p.lng]; });
+          routePolyline = L.polyline(latlngs, { color: '#0a5', weight: 4 }).addTo(map);
+          map.fitBounds(routePolyline.getBounds(), { padding: [20, 20] });
+        }
+        log('② done: shifted ' + pts.length + ' pts in FIT' + (elapsedSec != null ? (' / ' + elapsedSec + ' s') : ''));
+      }
+
+      function runApplyMainThread(routeFile, sensorFile, done) {
+        const applyOpts = { center: selectedCenter };
+        TrackRemap.applyPathToFIT(imagePathResult, routeFile, applyOpts)
+          .then(function (routeResult) {
+            if (!sensorFile) {
+              showApplyResult(routeResult);
+              return;
+            }
+            if (typeof TrackRemap.mergeFITSensorData !== 'function') {
+              showApplyResult(routeResult);
+              log('Heart-rate FIT was set but mergeFITSensorData is unavailable; applied route only.');
+              return;
+            }
+            return TrackRemap.mergeFITSensorData(routeResult.appliedPoints, sensorFile, { routeFitForSessionLap: routeResult.fitBlob })
+              .then(function (mergeResult) {
+                showApplyResult({
+                  appliedPoints: mergeResult.appliedPoints,
+                  fitBlob: mergeResult.fitBlob,
+                });
+                log('② done: route + HR merge ' + mergeResult.appliedPoints.length + ' pts');
+              });
+          })
+          .catch(function (err) {
+            log('Error: ' + (err && err.message ? err.message : String(err)));
+          })
+          .finally(done);
+      }
+
+      runApplyBtn.addEventListener('click', function () {
+        const startedAt = performance.now();
+        const stopProgressLog = startProgressLog('② Apply to FIT', startedAt);
+        const routeFile = fileFit.files[0];
+        if (!routeFile) { log('Please select a FIT file (route)'); return; }
+        if (!imagePathResult) { log('Load an image in step ① and create a route first'); return; }
+        if (typeof TrackRemap === 'undefined' || !TrackRemap.applyPathToFIT) {
+          log('applyPathToFIT is not available'); return;
+        }
+        const sensorFile = fileFitSensor.files && fileFitSensor.files[0];
+        runApplyBtn.disabled = true;
+        runApplyBtn.textContent = 'Working…';
+        status2.textContent = 'Working…';
+        const overlay = document.getElementById('processingOverlay');
+        processingOverlayMsg.textContent = '…';
+        overlay.style.display = 'flex';
+        log('② applying to FIT…');
+        function done() {
+          stopProgressLog();
+          runApplyBtn.disabled = false;
+          runApplyBtn.textContent = 'Apply to FIT';
+          overlay.style.display = 'none';
+        }
+        if (fitWorker) {
+          Promise.all([
+            routeFile.arrayBuffer(),
+            sensorFile ? sensorFile.arrayBuffer() : Promise.resolve(null),
+          ]).then(function ([routeArrayBuffer, sensorArrayBuffer]) {
+            fitWorker.onmessage = function (ev) {
+              const d = ev.data;
+              if (d.error) {
+                log('Error: ' + d.error);
+                done();
+                return;
+              }
+              const fitBlob = new Blob([d.fitArrayBuffer], { type: 'application/octet-stream' });
+              showApplyResult({
+                appliedPoints: d.appliedPoints,
+                fitBlob: fitBlob,
+                elapsedMs: performance.now() - startedAt,
+              });
+              log('② done: wrote ' + d.appliedPoints.length + ' pts to FIT');
+              done();
+            };
+            fitWorker.onerror = function () {
+              log('Worker error; retrying on main thread.');
+              runApplyMainThread(routeFile, sensorFile || null, done);
+            };
+            fitWorker.postMessage({
+              imagePathResult: imagePathResult,
+              routeArrayBuffer: routeArrayBuffer,
+              sensorArrayBuffer: sensorArrayBuffer || undefined,
+              center: selectedCenter || undefined,
+            }, [routeArrayBuffer].concat(sensorArrayBuffer ? [sensorArrayBuffer] : []));
+          }).catch(function (err) {
+            log('Error: ' + (err && err.message ? err.message : String(err)));
+            done();
+          });
+        } else {
+          runApplyMainThread(routeFile, sensorFile || null, done);
+        }
+      });
+
+      downloadFitBtn.addEventListener('click', function () {
+        if (!lastApplyResult || !lastApplyResult.fitBlob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(lastApplyResult.fitBlob);
+        a.download = 'route_from_image.fit';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+    })();
+  </script>
+</body>
+</html>

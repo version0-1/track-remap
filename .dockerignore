@@ -1,0 +1,6 @@
+# Auxiliary file for when the root is referenced from track-remap's compose
+.git
+.gitignore
+.cursor/
+*.log
+.env
